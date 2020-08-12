@@ -5,7 +5,7 @@ const logger = require("morgan");
 const cors = require("cors");
 
 const indexRouter = require("./routes/index");
-const utilsHelper = require("./bin/helpers/utils.helper");
+const utilsHelper = require("./helpers/utils.helper");
 
 const app = express();
 
@@ -20,28 +20,20 @@ app.use(express.static(path.join(__dirname, "public")));
 /* Initialize Routes */
 app.use("/api", indexRouter);
 
-// catch 404 and forard to error handler
+// catch 404 and forward to error handler
 app.use((req, res, next) => {
-  const err = new Error("Not Found");
-  err.status = 404;
+  const err = new Error("Page Not Found");
+  err.statusCode = 404;
   next(err);
 });
 
 /* Initialize Error Handling */
 app.use((err, req, res, next) => {
-  if (err.status === 404) {
-    return utilsHelper.sendResponse(
-      res,
-      404,
-      false,
-      null,
-      err,
-      "Route Not Found",
-      null
-    );
+  if (err.statusCode === 404) {
+    return utilsHelper.sendResponse(res, 404, false, null, err, null);
   } else {
-    console.log("ERROR", err);
-    return utilsHelper.sendResponse(res, 500, false, null, err, null, null);
+    console.log("ERROR", err.message);
+    return utilsHelper.sendResponse(res, 500, false, null, err, null);
   }
 });
 

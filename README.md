@@ -25,8 +25,8 @@ An Express app for RESTFUL API.
   Open `package.json`, add `"dev": "nodemon ./bin/www"` to `"scripts: {..}"`
 - Install dependencies:
   ```bash
-  npm i dotenv
-  npm i cors
+  npm i dotenv cors
+  npm i multer jimp
   ```
 - Remove everything in `public/`
 - Create `\.env`:
@@ -58,7 +58,16 @@ An Express app for RESTFUL API.
 
 ### Project structure
 
-- 
+```
+|- bin/
+|- controllers/
+|- helpers/
+|- middlewares/
+|- models/
+|- public/
+|- routes/
+|- app.js
+```
 
 ### Setup `app.js`
 
@@ -69,13 +78,12 @@ An Express app for RESTFUL API.
   
   // This function controls the way we response to the client
   // If we need to change the way to response later on, we only need to handle it here
-  utilsHelper.sendResponse = (res, status, success, data, errors, msg, token) => {
+  utilsHelper.sendResponse = (res, status, success, data, error, message, token) => {
     const response = {};
     if (success) response.success = success;
     if (data) response.data = data;
-    if (errors) response.errors = errors;
-    if (msg) response.msg = msg;
-    if (token) response.token = token;
+    if (error) response.error = {message: error.message};
+    if (message) response.message = message;
     return res.status(status).json(response);
   };
 
@@ -110,7 +118,7 @@ An Express app for RESTFUL API.
   const router = express.Router();
 
   // All route of Meme
-  const memeRoutes = require("./memeApi.js");
+  const memeRoutes = require("./memeApi");
   router.use("/memes", memeRoutes);
 
   module.exports = router;
@@ -122,6 +130,30 @@ An Express app for RESTFUL API.
   ...
   app.use(cookieParser());
   +app.use(cors());
+  ```
+- Error Handling: In `app.js`, add
+  ```javascript
+  /* Initialize Routes */
+  app.use("/api", indexRouter);
+
+  // catch 404 and forard to error handler
+  app.use((req, res, next) => {
+    const err = new Error("Not Found");
+    err.statusCode = 404;
+    next(err);
+  });
+
+  /* Initialize Error Handling */
+  app.use((err, req, res, next) => {
+    if (err.statusCode === 404) {
+      return utilsHelper.sendResponse(res, 404, false, null, err, null);
+    } else {
+      console.log("ERROR", err.message);
+      return utilsHelper.sendResponse(res, 500, false, null, err, null);
+    }
+  });
+
+  module.exports = app;
   ```
 - Test `localhost:5000\api\memes`, `localhost:5000\whatever`
 
@@ -149,4 +181,273 @@ An Express app for RESTFUL API.
   - Remember to save the requests
   - Hover the mouse on `Meme Generator` on the side menu, click the "Play" icon -> Click `Run` -> Click `Run Meme Generator`
   - You should see that we pass all the `Status test`
+
+### Step 1 - User can create a meme
+
+In this step we allow user to post an image and some texts to the server. The server will save the image in a folder, resize it if needed. Then to create a meme, the app will put the texts on the original image and save the meme as a new image. 
+
+#### Write a middleware to save the uploaded image
+
+- Create `/helpers/upload.helper.js`. This is a function that returns the `multer` middleware to save the image. The function takes in a folder path, create the folder if it's not exists, and use it as the storage.
+  ```javascript
+  const fileUploadHelper = (filePath) => {
+  const multer = require("multer");
+  const path = require("path");
+  const mkdirp = require("mkdirp");
+
+  const storage = multer.diskStorage({
+    destination: async (req, file, cb) => {
+      const uploadPath = path.resolve(filePath);
+      try {
+        const folderStat = await ensureFolderExists(uploadPath);
+        if (folderStat) {
+          cb(null, uploadPath);
+        } else {
+          cb(null, "");
+        }
+      } catch (err) {
+        cb(err);
+      }
+    },
+    filename: function (req, file, cb) {
+      const uniquePrefix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, uniquePrefix + "-" + file.originalname);
+      },
+    });
+    const ensureFolderExists = (path) => {
+      return new Promise((resolve, reject) => {
+        mkdirp(path, (err) => {
+          if (err) {
+            reject(err); // something else went wrong
+          } else {
+            resolve(true); // successfully created folder
+          }
+        });
+      });
+    };
+    return {
+      uploader: multer({
+        storage: storage,
+        fileFilter: (req, file, cb) => {
+          if (
+            !file.mimetype.includes("jpeg") &&
+            !file.mimetype.includes("jpg") &&
+            !file.mimetype.includes("png")
+          ) {
+            return cb(null, false, new Error("Only images are allowed"));
+          }
+          cb(null, true);
+        },
+      }),
+    };
+  };
+  module.exports = fileUploadHelper;
+  ```
+  - In `memeApi.js`:
+  ```javascript
+  const fileUpload = require("../helpers/upload.helper")("public/images/");
+  const uploader = fileUpload.uploader;
+  ...
+  /**
+  * @route POST api/memes
+  * @description Create a new meme
+  * @access Public
+  */
+  router.post("/", uploader.single("image"), (req, res, next) => {
+    console.log(req.file);
+    res.send({ status: "ok" });
+  });
+  ```
+  - Open Postman, create a new POST Request to `{{url}}/api/memes` called `Create meme`. In the `body` tab, choose `form-data`, put `image` as type `file` AS `KEY`, and select a file as VALUE. Click `Send`.
+  - You should see the `ok` response and find the image in `public/images`. The file object in `req` should look like this:
+  ```
+  {
+    fieldname: 'image',
+    originalname: 'C92D2327-7FF8-4445-8F5D-890EA780B6CB_1_201_a.jpeg',
+    encoding: '7bit',
+    mimetype: 'image/jpeg',
+    destination: 'public/images/',
+    filename: '1597210085549-957864468-C92D2327-7FF8-4445-8F5D-890EA780B6CB_1_201_a.jpeg',
+    path: 'public/images/1597210085549-957864468-C92D2327-7FF8-4445-8F5D-890EA780B6CB_1_201_a.jpeg',
+    size: 454050
+  }
+  ```
+
+#### A middleware to resize the file
+
+Let's continue to build another middleware to resize the uploaded image to have 400 pixel max width or heigth. We are using the libary Jimp.
+
+- Create `helpers/photo.helper.js`:
+  ```javascript
+  const Jimp = require("jimp");
+  const fs = require("fs");
+
+  const photoHelper = {};
+
+  photoHelper.resize = async (req, res, next) => {
+    if (req.file) {
+      try {
+        req.file.destination =
+          req.file.destination.split("\\").join("/").split("server/")[1] + "/";
+        req.file.path = req.file.path.split("\\").join("/").split("server/")[1];
+        Jimp.read(req.file.path, async (err, image) => {
+          if (err) next(err);
+          const img = await image.scaleToFit(400, 400).write(req.file.path);
+          next();
+        });
+      } catch (err) {
+        next(err);
+      }
+    } else {
+      next(new Error("Image required"));
+    }
+  };
+
+  module.exports = photoHelper;
+  ```
+- Then in `memeApi.js`: import `photoHelper` and add `photoHelper.resize` after `uploader`:
+  ```javascript
+  const photoHelper = require("../helpers/photo.helper");
+  ...
+  router.post(
+    "/",
+    uploader.single("image"),
+    photoHelper.resize,
+    (req, res, next) => {
+      console.log(req.file);
+      res.send({ status: "ok" });
+    }
+  );
+  ```
+- Test again with the Postman request `Create meme`
+- You should see that the image that is saved in `public/images` is now resized.
+
+#### Create the meme controller
+
+In this simple app, we use a `json` file to store the info of memes. This should be avoid in production app, and you should use a database to store the data.
+
+- Create `/memes.json`:
+  ```json
+  {
+    "memes":[]
+  }
+  ```
+- We use a library called `crypto` to generate the id for the memes. In `utilsHelper.js`, add:
+  ```javascript
+  const crypto = require("crypto");
+  ...
+  utilsHelper.generateRandomHexString = (len) => {
+    return crypto
+      .randomBytes(Math.ceil(len / 2))
+      .toString("hex") // convert to hexadecimal format
+      .slice(0, len)
+      .toUpperCase(); // return required number of characters
+  };
+  ```
+- Next we prepare a function to print the text on the image. In `photo.helper.js`, add:
+  ```javascript
+  photoHelper.putTextOnImage = async (
+    originalImagePath,
+    outputMemePath,
+    texts
+  ) => {
+    try {
+      const image = await Jimp.read(originalImagePath);
+      const dimension = {
+        width: image.bitmap.width,
+        height: image.bitmap.height,
+      };
+      const promises = texts.map(async (text) => {
+        const font = await Jimp.loadFont(
+          Jimp[`FONT_SANS_${text.size}_${text.color}`]
+        );
+        await image.print(
+          font,
+          0,
+          0,
+          {
+            text: text.content,
+            alignmentX: Jimp[text.alignmentX],
+            alignmentY: Jimp[text.alignmentY],
+          },
+          dimension.width,
+          dimension.height
+        );
+      });
+      await Promise.all(promises);
+      await image.writeAsync(outputMemePath);
+    } catch (err) {
+      throw err;
+    }
+  };
+  ```
+
+We usually don't put the functions that handle requests in `routes/..`. Instead we will create controllers.
+
+- Create `controllers/memeController.js`:
+  ```javascript
+  const fs = require("fs");
+  const utilsHelper = require("../helpers/utils.helper");
+  const photoHelper = require("../helpers/photo.helper");
+
+  const memeController = {};
+
+  memeController.createMeme = async (req, res, next) => {
+    try {
+      // Read data from the json file
+      let rawData = fs.readFileSync("memes.json");
+      let memes = JSON.parse(rawData).memes;
+      const { texts } = req.body;
+      const meme = {};
+      // Prepare data for the new meme
+      meme.id = utilsHelper.generateRandomHexString(15);
+      meme.originalImage = req.file.filename;
+      meme.originalImagePath = req.file.path;
+      meme.outputMemePath =
+        req.file.destination +
+        "MEME_" +
+        meme.id +
+        "." +
+        meme.originalImage.split(".").pop();
+      meme.texts = texts?.length ? texts.map((text) => JSON.parse(text)) : [];
+      // Put text on image
+      await photoHelper.putTextOnImage(
+        meme.originalImagePath,
+        meme.outputMemePath,
+        meme.texts
+      );
+      // Append the new meme into the list and save to the json file
+      memes.push(meme);
+      fs.writeFileSync("memes.json", JSON.stringify({ memes }));
+
+      return utilsHelper.sendResponse(
+        res,
+        200,
+        true,
+        meme,
+        null,
+        "The new meme has been created!"
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  module.exports = memeController;
+  ```
+
+- Then put the function `createMeme()` in `memeApi.js` to handle the POST request:
+```javascript
+router.post(
+  "/",
+  uploader.single("image"),
+  photoHelper.resize,
+  memeController.createMeme
+);
+```
+- Test with Postman
+  - POST request `Create meme`, expect response 200
+  - Create POST request `Create meme without image`, expect response 500 "Image required"
+  - Create POST request `Create meme without texts`, expect response 200
+
 
