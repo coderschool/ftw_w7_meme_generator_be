@@ -5,11 +5,6 @@ const photoHelper = {};
 photoHelper.resize = async (req, res, next) => {
   if (req.file) {
     try {
-      console.log(req.file);
-      req.file.destination =
-        req.file.destination.split("\\").join("/").split("server/")[1] + "/";
-      req.file.path = req.file.path.split("\\").join("/").split("server/")[1];
-
       const image = await Jimp.read(req.file.path);
       await image.scaleToFit(400, 400).write(req.file.path);
       next();

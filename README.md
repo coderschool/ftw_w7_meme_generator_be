@@ -287,14 +287,9 @@ Let's continue to build another middleware to resize the uploaded image to have 
   photoHelper.resize = async (req, res, next) => {
     if (req.file) {
       try {
-        req.file.destination =
-          req.file.destination.split("\\").join("/").split("server/")[1] + "/";
-        req.file.path = req.file.path.split("\\").join("/").split("server/")[1];
-        Jimp.read(req.file.path, async (err, image) => {
-          if (err) next(err);
-          const img = await image.scaleToFit(400, 400).write(req.file.path);
-          next();
-        });
+        const image = await Jimp.read(req.file.path);
+        await image.scaleToFit(400, 400).write(req.file.path);
+        next();
       } catch (err) {
         next(err);
       }
