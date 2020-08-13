@@ -10,9 +10,7 @@ const memeController = require("../controllers/memeController");
  * @description Get all memes
  * @access Public
  */
-router.get("/", function (req, res, next) {
-  res.send({ status: "ok", data: "Get all memes" });
-});
+router.get("/", memeController.getMemes);
 
 /**
  * @route POST api/memes
@@ -25,5 +23,19 @@ router.post(
   photoHelper.resize,
   memeController.createMeme
 );
+
+/**
+ * @route GET api/memes/images
+ * @description Get all memes
+ * @access Public
+ */
+router.get("/images", memeController.getOriginalImages);
+
+/**
+ * @route PUT api/memes/:id
+ * @description Update a meme
+ * @access Public
+ */
+router.put("/:id", memeController.updateMeme);
 
 module.exports = router;

@@ -182,11 +182,11 @@ An Express app for RESTFUL API.
   - Hover the mouse on `Meme Generator` on the side menu, click the "Play" icon -> Click `Run` -> Click `Run Meme Generator`
   - You should see that we pass all the `Status test`
 
-### Step 1 - User can create a meme
+### User can create a meme
 
 In this step we allow user to post an image and some texts to the server. The server will save the image in a folder, resize it if needed. Then to create a meme, the app will put the texts on the original image and save the meme as a new image. 
 
-#### Write a middleware to save the uploaded image
+#### Task 1 - Write a middleware to save the uploaded image
 
 - Create `/helpers/upload.helper.js`. This is a function that returns the `multer` middleware to save the image. The function takes in a folder path, create the folder if it's not exists, and use it as the storage.
   ```javascript
@@ -273,7 +273,7 @@ In this step we allow user to post an image and some texts to the server. The se
   }
   ```
 
-#### A middleware to resize the file
+#### Task 2 - A middleware to resize the file
 
 Let's continue to build another middleware to resize the uploaded image to have 400 pixel max width or heigth. We are using the libary Jimp.
 
@@ -322,7 +322,7 @@ Let's continue to build another middleware to resize the uploaded image to have 
 - Test again with the Postman request `Create meme`
 - You should see that the image that is saved in `public/images` is now resized.
 
-#### Create the meme controller
+#### Task 3 - Create the meme controller
 
 In this simple app, we use a `json` file to store the info of memes. This should be avoid in production app, and you should use a database to store the data.
 
@@ -403,12 +403,7 @@ We usually don't put the functions that handle requests in `routes/..`. Instead 
       meme.id = utilsHelper.generateRandomHexString(15);
       meme.originalImage = req.file.filename;
       meme.originalImagePath = req.file.path;
-      meme.outputMemePath =
-        req.file.destination +
-        "MEME_" +
-        meme.id +
-        "." +
-        meme.originalImage.split(".").pop();
+      meme.outputMemePath = `${req.file.destination}MEME_${meme.id}.${meme.originalImage.split(".").pop()}`;
       meme.texts = texts?.length ? texts.map((text) => JSON.parse(text)) : [];
       // Put text on image
       await photoHelper.putTextOnImage(
@@ -416,8 +411,10 @@ We usually don't put the functions that handle requests in `routes/..`. Instead 
         meme.outputMemePath,
         meme.texts
       );
-      // Append the new meme into the list and save to the json file
-      memes.push(meme);
+      // Add the new meme to the beginning of the list and save to the json file
+      meme.createdAt = Date.now();
+      meme.updatedAt = Date.now();
+      memes.unshift(meme);
       fs.writeFileSync("memes.json", JSON.stringify({ memes }));
 
       return utilsHelper.sendResponse(
@@ -449,5 +446,190 @@ router.post(
   - POST request `Create meme`, expect response 200
   - Create POST request `Create meme without image`, expect response 500 "Image required"
   - Create POST request `Create meme without texts`, expect response 200
+
+### User can get the list of all memes with pagination
+
+Now we have a bunch of test memes in the json file. Let's create an API to provide list of meme with pagination.
+
+#### Task 4 - Create the `getMemes()` controller
+
+Let's create the controller to handle the request and quickly test whether we can get the query params:
+- In `memeController.js`, add:
+  ```javascript
+  memeController.getMemes = (req, res, next) => {
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.perPage) || 10;
+
+    console.log(page, perPage);
+    res.status(200).json({ page, perPage });
+  };
+  ```
+- In `memeApi.js`, change:
+  ```diff
+  /**
+   * @route GET api/memes
+   * @description Get all memes
+   * @access Public
+   */
+  +router.get("/", memeController.getMemes);
+  ```
+- In Postman, change `Get all memes` URL to `{{url}}/api/memes?page=2&perPage=20`, expect to see response with according page and perPage.
+- Now let's write some code to return the according memes given `page` and `pageNum`. In `memeController.js`, add:
+  ```javascript
+  memeController.getMemes = (req, res, next) => {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const perPage = parseInt(req.query.perPage) || 10;
+
+
+      // Read data from the json file
+      let rawData = fs.readFileSync("memes.json");
+      let memes = JSON.parse(rawData).memes;
+      // Calculate slicing
+      const totalMemes = memes.length;
+      const totalPages = Math.ceil(totalMemes / perPage);
+      const offset = perPage * (page - 1);
+      memes = memes.slice(offset, offset + perPage);
+
+      return utilsHelper.sendResponse(
+        res,
+        200,
+        true,
+        { memes, totalPages },
+        null,
+        "Get memes successful"
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+  ```
+- Open Postman request `Get all memes`, play around with `page` and `pageNum` and check the result. You might want to write some tests for this API.
+
+### User can see a list of original images
+
+This feature allows user to create meme based on original images that are uploaded by the other users. 
+
+#### Task 5 - Create `getOriginalImages()` controller
+
+We have the list of memes and in each meme we have the path to the original images. But before we return that (with pagination), we need to remove duplications first.
+
+Similar to the previous task, let's create the controller and quickly test whether we can get the query params
+- In `memeApi.js`, add
+  ```javascript
+  /**
+   * @route GET api/memes/images
+   * @description Get all memes
+   * @access Public
+   */
+  router.get("/images", memeController.getOriginalImages);
+  ```
+- In `memeController.js`, add:
+  ```javascript
+  memeController.getOriginalImages = (req, res, next) => {
+    try {
+      const page = req.query.page || 1;
+      const perPage = req.query.perPage || 10;
+
+      // Read data from the json file
+      let rawData = fs.readFileSync("memes.json");
+      let memes = JSON.parse(rawData).memes;
+      let originalImages = memes.map((item) => item.originalImagePath);
+      originalImages = originalImages.filter(
+        (item, i, arr) => arr.indexOf(item) === i
+      );
+      // Calculate slicing
+      const totalMemes = memes.length;
+      const totalPages = Math.ceil(totalMemes / perPage);
+      const offset = perPage * (page - 1);
+      originalImages = originalImages.slice(offset, offset + perPage);
+
+      return utilsHelper.sendResponse(
+        res,
+        200,
+        true,
+        { originalImages, totalPages },
+        null,
+        "Get original images successful"
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+  ```
+- Open Postman, create a new GET request to `{{url}}/api/memes/images?page=1&perPage=2` called `Get all original images` (very similar to `Get all memes`). Test the new API.
+
+### User can edit the texts on the meme
+
+In this feature, we allows user to edit the meme and change the content of the texts on it. So we will create a new API that handles PUT request to `api/memes/:id`. The idea is simple, we will take the original image and put the new texts on it. Basically we'll overwrite the old meme.
+
+- Create a new route to `api/memes/:id`: In `memeApi.js`, add:
+  ```javascript
+  memeController.updateMeme = async (req, res, next) => {
+    try {
+      const memeId = req.params.id;
+      // Read data from the json file
+      let rawData = fs.readFileSync("memes.json");
+      let memes = JSON.parse(rawData).memes;
+      const index = memes.findIndex((meme) => meme.id === memeId);
+      if (index === -1) {
+        return utilsHelper.sendResponse(
+          res,
+          400,
+          false,
+          null,
+          new Error("Meme not found"),
+          null
+        );
+      }
+      const meme = memes[index];
+      meme.texts = req.body.texts || [];
+      meme.updatedAt = Date.now();
+
+      // Put text on image
+      await photoHelper.putTextOnImage(
+        meme.originalImagePath,
+        meme.outputMemePath,
+        meme.texts
+      );
+      fs.writeFileSync("memes.json", JSON.stringify({ memes }));
+      return utilsHelper.sendResponse(
+        res,
+        200,
+        true,
+        meme,
+        null,
+        "Meme has been updated!"
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+  ```
+- Test with Postman: Pick one meme id in the json file, then
+  - Create PUT request e.g. `{{url}}/api/memes/80CC10FB2A9BBEF`, add in `Headers` `Content-Type: application/json`. In `body`, choose `raw`:
+  ```json
+  {
+    "texts": [
+                {
+                    "size": 64,
+                    "color": "WHITE",
+                    "alignmentX": "HORIZONTAL_ALIGN_CENTER",
+                    "alignmentY": "VERTICAL_ALIGN_BOTTOM",
+                    "content": "This is an example"
+                },
+                {
+                    "size": 32,
+                    "color": "WHITE",
+                    "alignmentX": "HORIZONTAL_ALIGN_CENTER",
+                    "alignmentY": "VERTICAL_ALIGN_TOP",
+                    "content": "This is an example"
+                }
+            ]
+  }
+  ```
+  - Test without `texts`
+  - Test with wrong meme ID
+
 
 
