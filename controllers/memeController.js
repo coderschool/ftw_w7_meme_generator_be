@@ -18,7 +18,8 @@ memeController.createMeme = async (req, res, next) => {
     meme.outputMemePath = `${req.file.destination}MEME_${
       meme.id
     }.${meme.originalImage.split(".").pop()}`;
-    meme.texts = texts?.length ? texts.map((text) => JSON.parse(text)) : [];
+    meme.texts =
+      texts && texts.length ? texts.map((text) => JSON.parse(text)) : [];
     // Put text on image
     await photoHelper.putTextOnImage(
       meme.originalImagePath,
