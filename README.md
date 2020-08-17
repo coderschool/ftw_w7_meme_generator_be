@@ -1,8 +1,20 @@
-# Meme Generator Server
+---
+title: FTW Week 7 - Meme Generator ExpressJs
+tags: CoderSchool, FTW, Project
+---
+
+# Meme Generator Express
 
 ## Introduction
 
-An Express app for RESTFUL API.
+An RESTFUL API with Express.js.
+
+![](https://i.imgur.com/hGYRARj.png)
+---
+![](https://i.imgur.com/UFGGz29.png)
+---
+![](https://i.imgur.com/R5RLRUP.png)
+
 
 ## Implementation
 
@@ -287,6 +299,8 @@ Let's continue to build another middleware to resize the uploaded image to have 
   photoHelper.resize = async (req, res, next) => {
     if (req.file) {
       try {
+        req.file.destination = "public" + req.file.destination.split("public")[1];
+        req.file.path = "public" + req.file.path.split("public")[1];
         const image = await Jimp.read(req.file.path);
         await image.scaleToFit(400, 400).write(req.file.path);
         next();
@@ -392,14 +406,19 @@ We usually don't put the functions that handle requests in `routes/..`. Instead 
       // Read data from the json file
       let rawData = fs.readFileSync("memes.json");
       let memes = JSON.parse(rawData).memes;
-      const { texts } = req.body;
+      let { texts } = req.body;
       const meme = {};
       // Prepare data for the new meme
       meme.id = utilsHelper.generateRandomHexString(15);
       meme.originalImage = req.file.filename;
       meme.originalImagePath = req.file.path;
-      meme.outputMemePath = `${req.file.destination}MEME_${meme.id}.${meme.originalImage.split(".").pop()}`;
-      meme.texts = texts?.length ? texts.map((text) => JSON.parse(text)) : [];
+      meme.outputMemePath = `${req.file.destination}/MEME_${meme.id}.${meme.originalImage.split(".").pop()}`;
+      if (texts) {
+        if (!Array.isArray(texts)) texts = [texts];
+        meme.texts = texts.map((text) => JSON.parse());
+      } else {
+        meme.texts = [];
+      }
       // Put text on image
       await photoHelper.putTextOnImage(
         meme.originalImagePath,
@@ -438,7 +457,10 @@ router.post(
 );
 ```
 - Test with Postman
-  - POST request `Create meme`, expect response 200
+  - POST request `Create meme`, add 2 `texts` to the body below `image`. An example of a text object:
+  ```
+  {"size":32,"color":"BLACK","alignmentX":"HORIZONTAL_ALIGN_CENTER","alignmentY":"VERTICAL_ALIGN_BOTTOM","content":"This is an example"}
+  ```
   - Create POST request `Create meme without image`, expect response 500 "Image required"
   - Create POST request `Create meme without texts`, expect response 200
 
@@ -578,7 +600,13 @@ In this feature, we allows user to edit the meme and change the content of the t
         );
       }
       const meme = memes[index];
-      meme.texts = req.body.texts || [];
+      let {texts} = req.body;
+      if (texts) {
+        if (!Array.isArray(texts)) texts = [texts];
+        meme.texts = texts.map((text) => JSON.parse());
+      } else {
+        meme.texts = [];
+      }
       meme.updatedAt = Date.now();
 
       // Put text on image
@@ -601,6 +629,7 @@ In this feature, we allows user to edit the meme and change the content of the t
     }
   };
   ```
+- In `memeApi.js`, add: `router.put('/:id', memeController.updateMeme)`
 - Test with Postman: Pick one meme id in the json file, then
   - Create PUT request e.g. `{{url}}/api/memes/80CC10FB2A9BBEF`, add in `Headers` `Content-Type: application/json`. In `body`, choose `raw`:
   ```json

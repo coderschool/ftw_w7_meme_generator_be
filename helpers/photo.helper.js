@@ -1,10 +1,13 @@
 const Jimp = require("jimp");
+const fs = require("fs");
 
 const photoHelper = {};
 
 photoHelper.resize = async (req, res, next) => {
   if (req.file) {
     try {
+      req.file.destination = "public" + req.file.destination.split("public")[1];
+      req.file.path = "public" + req.file.path.split("public")[1];
       const image = await Jimp.read(req.file.path);
       await image.scaleToFit(400, 400).write(req.file.path);
       next();
@@ -15,51 +18,6 @@ photoHelper.resize = async (req, res, next) => {
     next(new Error("Image required"));
   }
 };
-
-// photoHelper.putTextOnImage = async (req, res, next) => {
-//   if (req.file) {
-//     Jimp.read(req.file.path, async (err, image) => {
-//       if (err) next(err);
-//       try {
-//         const font = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
-//         const dimension = {
-//           width: image.bitmap.width,
-//           height: image.bitmap.height,
-//         };
-//         const img = await image
-//           .print(
-//             font,
-//             0,
-//             0,
-//             {
-//               text: "This is an example",
-//               alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
-//               alignmentY: Jimp.VERTICAL_ALIGN_TOP,
-//             },
-//             dimension.width,
-//             dimension.height
-//           )
-//           .print(
-//             font,
-//             0,
-//             0,
-//             {
-//               text: "This is another example",
-//               alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
-//               alignmentY: Jimp.VERTICAL_ALIGN_BOTTOM,
-//             },
-//             dimension.width,
-//             dimension.height
-//           )
-//           .write(req.file.path);
-//         next();
-//       } catch (err) {
-//         next(err);
-//       }
-//     });
-//   }
-//   next();
-// };
 
 photoHelper.putTextOnImage = async (
   originalImagePath,
