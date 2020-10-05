@@ -15,17 +15,16 @@ memeController.createMeme = async (req, res, next) => {
     meme.id = utilsHelper.generateRandomHexString(15);
     meme.originalImage = req.file.filename;
     meme.originalImagePath = req.file.path;
-    console.log(req.file);
     meme.outputMemePath = `${req.file.destination}/MEME_${
       meme.id
     }.${meme.originalImage.split(".").pop()}`;
     if (texts) {
       if (!Array.isArray(texts)) texts = [texts];
-      meme.texts = texts.map((text) => JSON.parse());
+      meme.texts = texts.map((text) => JSON.parse(text));
     } else {
       meme.texts = [];
     }
-    // texts && texts.length ?  : [];
+
     // Put text on image
     await photoHelper.putTextOnImage(
       meme.originalImagePath,
@@ -72,7 +71,7 @@ memeController.updateMeme = async (req, res, next) => {
     let { texts } = req.body;
     if (texts) {
       if (!Array.isArray(texts)) texts = [texts];
-      meme.texts = texts.map((text) => JSON.parse());
+      meme.texts = texts.map((text) => JSON.parse(text));
     } else {
       meme.texts = [];
     }

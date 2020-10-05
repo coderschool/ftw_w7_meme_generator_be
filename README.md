@@ -83,7 +83,7 @@ An RESTFUL API with Express.js.
 
 ### Setup `app.js`
 
-- Create `/helpers/utilsHelper.js`:
+- Create `/helpers/utils.helper.js`:
   ```javascript
   "use strict";
   const utilsHelper = {};
@@ -101,7 +101,7 @@ An RESTFUL API with Express.js.
 
   module.exports = utilsHelper;
   ```
-  In `app.js`, add: `const utilHelper = require("./helpers/utils.helper");`
+  In `app.js`, add: `const utilsHelper = require("./helpers/utils.helper");`
 - In `routes/`, delete `users.js`. In `app.js`,remove
   ```diff
   -const usersRouter = require("./routes/users");
