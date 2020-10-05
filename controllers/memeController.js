@@ -69,9 +69,8 @@ memeController.updateMeme = async (req, res, next) => {
     }
     const meme = memes[index];
     let { texts } = req.body;
-    if (texts) {
-      if (!Array.isArray(texts)) texts = [texts];
-      meme.texts = texts.map((text) => JSON.parse(text));
+    if (texts && Array.isArray(texts)) {
+      meme.texts = texts;
     } else {
       meme.texts = [];
     }
