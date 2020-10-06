@@ -49,5 +49,4 @@ const fileUploadHelper = (filePath) => {
     }),
   };
 };
-
 module.exports = fileUploadHelper;

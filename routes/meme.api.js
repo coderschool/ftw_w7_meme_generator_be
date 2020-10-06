@@ -3,7 +3,7 @@ const router = express.Router();
 const fileUpload = require("../helpers/upload.helper")("public/images/");
 const uploader = fileUpload.uploader;
 const photoHelper = require("../helpers/photo.helper");
-const memeController = require("../controllers/memeController");
+const memeController = require("../controllers/meme.controller");
 
 /**
  * @route GET api/memes
@@ -26,14 +26,14 @@ router.post(
 
 /**
  * @route GET api/memes/images
- * @description Get all memes
+ * @description Get list of original images
  * @access Public
  */
 router.get("/images", memeController.getOriginalImages);
 
 /**
  * @route PUT api/memes/:id
- * @description Update a meme
+ * @description Update text on the meme
  * @access Public
  */
 router.put("/:id", memeController.updateMeme);
